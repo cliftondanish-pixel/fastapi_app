@@ -7,6 +7,7 @@ from routes import auth
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+# from routes.auth import router as auth_router
 
 # app.include_router(auth.router)
 # Base.metadata.create_all(bind=engine)
@@ -16,9 +17,6 @@ app = FastAPI(
     version=settings.APP_VERSION
 )
 
-@app.get("/")
-def root():
-    return {"message": "Welcome"}
 
 @app.get("/health")
 def health():
@@ -45,7 +43,9 @@ def db_test():
             "database": "connected",
             "result": result.scalar()
         }
-    
+        
+# app.include_router(auth_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
