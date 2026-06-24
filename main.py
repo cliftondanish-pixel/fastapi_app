@@ -17,6 +17,9 @@ app = FastAPI(
     version=settings.APP_VERSION
 )
 
+@app.get("/")
+def root():
+    return {"message": "Welcome"}
 
 @app.get("/health")
 def health():
