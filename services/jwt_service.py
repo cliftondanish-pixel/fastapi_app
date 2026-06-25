@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
-from jose import jwt
+from jose import jwt, JWTError
+from fastapi import HTTPException
 from core.config import settings
 
 
@@ -13,3 +14,10 @@ def create_otp_token(email: str):
     expire = datetime.utcnow() + timedelta(minutes=settings.OTP_TOKEN_EXPIRE_MINUTES)
     payload = {"email": email,"exp": expire}
     return jwt.encode(payload,settings.SECRET_KEY,algorithm=settings.ALGORITHM)
+
+def decode_token(token: str):
+    try:
+        payload = jwt.decode(token,settings.SECRET_KEY,algorithms=settings.ALGORITHM)
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401,detail="Invalid token")
