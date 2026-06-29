@@ -3,12 +3,15 @@ from fastapi import HTTPException
 from datetime import datetime, timedelta
 from core.config import settings
 from models.user import User
+from services.password_service import verify_password
+from services.jwt_service import (create_access_token,create_refresh_token)
+from models.refresh_token import RefreshToken
 from models.otp_verification import OTPVerification
 from services.otp_service import generate_otp
 from services.email_service import send_otp_email
 from services.password_service import hash_password
 from models.tenant import Tenant
-from schemas.auth import RegisterRequest
+from schemas.auth import (RegisterRequest,LoginRequest)
 
 
 def register_user(db:Session,request:RegisterRequest):
@@ -112,12 +115,12 @@ def verify_otp(db:Session,email:str,otp:str):
         )
         db.add(tenant)
         db.commit()
-    otp_record.verified = True 
-    
-    db.commit()
-    return {
-        "message":"Account verified successfully"
-    }
+        otp_record.verified = True 
+        
+        db.commit()
+        return {
+            "message":"Account verified successfully"
+        }
     
 def resend_otp(
     db: Session,
@@ -166,5 +169,74 @@ def resend_otp(
         "message": "OTP resent successfully"
     }
     
+def login_user(
+    db: Session,
+    request: LoginRequest
+):
+
+    user = db.query(User).filter(
+        User.email == request.email
+    ).first()
+
+
+    if not user:
+
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+
+    if not verify_password(
+        request.password,
+        user.password_hash
+    ):
+
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+
+    if not user.is_active:
+
+        raise HTTPException(
+            status_code=403,
+            detail="Account is not active"
+        )
+
+
+    access_token = create_access_token(
+        {
+            "user_id": user.id,
+            "email": user.email
+        }
+    )
+
+
+    refresh_token = create_refresh_token(
+        {
+            "user_id": user.id
+        }
+    )
+
+
+    refresh_token_record = RefreshToken(
+        user_id=user.id,
+        token=refresh_token,
+        expires_at=datetime.utcnow() + timedelta(
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+        )
+    )
+
+    db.add(refresh_token_record)
+    db.commit()
+
+
+    return {
+        "message": "Login successful",
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    }
 
     

@@ -1,5 +1,6 @@
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import (Column, Integer, String, Boolean, DateTime)
+from sqlalchemy import ForeignKey
 
 from datetime import datetime
 class Base(DeclarativeBase):
@@ -17,6 +18,3 @@ class User(Base):
     is_active = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    
-    
