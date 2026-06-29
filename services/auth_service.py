@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from core.config import settings
 from models.user import User
 from services.password_service import verify_password
-from services.jwt_service import (create_access_token,create_refresh_token)
+from services.jwt_service import (create_access_token,create_refresh_token,decode_token,create_otp_token)
 from models.refresh_token import RefreshToken
 from models.otp_verification import OTPVerification
 from services.otp_service import generate_otp
@@ -238,5 +238,251 @@ def login_user(
         "access_token": access_token,
         "refresh_token": refresh_token
     }
-
     
+def refresh_access_token(
+    db: Session,
+    refresh_token: str
+):
+
+    # Verify JWT
+    payload = decode_token(refresh_token)
+
+    user_id = payload.get("user_id")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid refresh token"
+        )
+
+    # Check token exists in DB
+    token_record = db.query(RefreshToken).filter(
+        RefreshToken.token == refresh_token
+    ).first()
+
+    if not token_record:
+        raise HTTPException(
+            status_code=401,
+            detail="Refresh token not found"
+        )
+
+    # Check expiry
+    if datetime.utcnow() > token_record.expires_at:
+        raise HTTPException(
+            status_code=401,
+            detail="Refresh token expired"
+        )
+
+    # Get user
+    user = db.query(User).filter(
+        User.id == user_id
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    # Create new access token
+    access_token = create_access_token(
+        {
+            "user_id": user.id,
+            "email": user.email
+        }
+    )
+    
+    # Create NEW refresh token
+    new_refresh_token = create_refresh_token(
+        {
+            "user_id": user.id
+        }
+    )
+
+
+    # Delete old refresh token
+    db.delete(token_record)
+
+
+    # Save new refresh token
+    new_token_record = RefreshToken(
+        user_id=user.id,
+        token=new_refresh_token,
+        expires_at=datetime.utcnow()
+        + timedelta(
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+        )
+    )
+
+    db.add(new_token_record)
+    db.commit()
+
+
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token
+    }
+
+def logout_user(
+    db: Session,
+    refresh_token: str
+):
+
+    token_record = db.query(
+        RefreshToken
+    ).filter(
+        RefreshToken.token == refresh_token
+    ).first()
+
+
+    if token_record:
+        db.delete(token_record)
+        db.commit()
+
+
+    return {
+        "message": "Logout successful"
+    }
+
+def forgot_password(
+    db: Session,
+    email: str
+):
+
+    user = db.query(User).filter(
+        User.email == email
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    otp = generate_otp()
+
+    otp_record = OTPVerification(
+        email=email,
+        otp=otp,
+        purpose="FORGOT_PASSWORD",
+        retry_count=0,
+        expires_at=datetime.utcnow() + timedelta(minutes=5)
+    )
+
+    db.add(otp_record)
+    db.commit()
+
+    send_otp_email(email, otp)
+
+    otp_token = create_otp_token(email)
+
+    return {
+        "message": "OTP sent successfully",
+        "otp_token": otp_token
+    }
+    
+def verify_forgot_otp(
+    db: Session,
+    email: str,
+    otp: str
+):
+
+    otp_record = (
+        db.query(OTPVerification)
+        .filter(
+            OTPVerification.email == email,
+            OTPVerification.purpose == "FORGOT_PASSWORD",
+            OTPVerification.verified == False
+        )
+        .order_by(OTPVerification.id.desc())
+        .first()
+    )
+
+    if not otp_record:
+        raise HTTPException(
+            status_code=404,
+            detail="OTP not found"
+        )
+
+    if otp_record.retry_count >= 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum retries exceeded"
+        )
+
+    if datetime.utcnow() > otp_record.expires_at:
+        raise HTTPException(
+            status_code=400,
+            detail="OTP has expired"
+        )
+
+    if otp_record.otp != otp:
+
+        otp_record.retry_count += 1
+        db.commit()
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid OTP"
+        )
+
+    otp_record.verified = True
+    db.commit()
+
+    return {
+        "message": "OTP verified successfully"
+    }
+    
+def reset_password(
+    db: Session,
+    email: str,
+    password: str,
+    confirm_password: str
+):
+
+    if password != confirm_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Passwords do not match"
+        )
+
+    # Get latest verified forgot-password OTP
+    otp_record = (
+        db.query(OTPVerification)
+        .filter(
+            OTPVerification.email == email,
+            OTPVerification.purpose == "FORGOT_PASSWORD",
+            OTPVerification.verified == True
+        )
+        .order_by(OTPVerification.id.desc())
+        .first()
+    )
+
+    if not otp_record:
+        raise HTTPException(
+            status_code=400,
+            detail="OTP verification required"
+        )
+
+    # Find user
+    user = (
+        db.query(User)
+        .filter(User.email == email)
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    # Update password
+    user.password_hash = hash_password(password)
+
+    db.commit()
+
+    return {
+        "message": "Password reset successful"
+    }
+

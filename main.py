@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from core.database import engine
 from core.config import settings
@@ -7,7 +7,6 @@ from routes import auth
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from routes.auth import router as auth_router
 
 # Base.metadata.create_all(bind=engine)
 
@@ -47,6 +46,8 @@ def db_test():
             "database": "connected",
             "result": result.scalar()
         }
+        
+
 
 app.add_middleware(
     CORSMiddleware,

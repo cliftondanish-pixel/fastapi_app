@@ -25,17 +25,29 @@ class RegisterRequest(BaseModel):
         return value
     
 class VerifyOTPRequest(BaseModel):
-        otp:str
+    otp:str
         
 class LoginRequest(BaseModel):
-        email:EmailStr
-        password:str
+    email:EmailStr
+    password:str
         
 class ForgotPasswordRequest(BaseModel):
-        email:EmailStr
+    email:EmailStr
+        
+class VerifyForgotOTPRequest(BaseModel):
+    otp: str
         
 class ResetPasswordRequest(BaseModel):
-        new_password:str
-        confirm_password:str
-        
+    new_password:str
+    confirm_password:str
+
+class UserResponse(BaseModel):
+    id: int
+    full_name: str
+    email: EmailStr
+    account_type: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
     
