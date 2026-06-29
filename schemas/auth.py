@@ -24,17 +24,17 @@ class RegisterRequest(BaseModel):
             raise ValueError("Organization name is required")
         return value
     
-    class VerifyOTPRequest(BaseModel):
+class VerifyOTPRequest(BaseModel):
         otp:str
         
-    class LoginRequest(BaseModel):
+class LoginRequest(BaseModel):
         email:EmailStr
         password:str
         
-    class ForgotPasswordRequest(BaseModel):
+class ForgotPasswordRequest(BaseModel):
         email:EmailStr
         
-    class ResetPasswordRequest(BaseModel):
+class ResetPasswordRequest(BaseModel):
         new_password:str
         confirm_password:str
         

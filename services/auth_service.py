@@ -15,6 +15,20 @@ def register_user(db:Session,request:RegisterRequest):
     existing_user = db.query(User).filter(User.email == request.email).first()
     if existing_user:
         raise HTTPException(status_code=400,detail="Email already registered")
+    
+    pending_registration = db.query(
+        OTPVerification
+    ).filter(
+        OTPVerification.email == request.email,
+        OTPVerification.verified.is_(False)
+    ).first()
+    
+    if pending_registration:
+        raise HTTPException(
+            status_code=400,
+            detail="OTP already sent. Please verify or use resend OTP."
+    )
+    
     if request.password != request.confirm_password:
         raise HTTPException(status_code=400,detail="Passwords do not match")
     
@@ -66,6 +80,17 @@ def verify_otp(db:Session,email:str,otp:str):
         otp_record.retry_count +=1
         db.commit()
         raise HTTPException(status_code=400,detail="Invalid OTP")
+    
+    existing_user = db.query(User).filter(
+    User.email == email
+    ).first()
+    
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="User already exists"
+        )
+    
     user = User(
         full_name=otp_record.full_name,
         email=otp_record.email,
@@ -92,6 +117,53 @@ def verify_otp(db:Session,email:str,otp:str):
     db.commit()
     return {
         "message":"Account verified successfully"
+    }
+    
+def resend_otp(
+    db: Session,
+    email: str
+):
+
+    otp_record = (
+        db.query(OTPVerification)
+        .filter(
+            OTPVerification.email == email,
+            OTPVerification.purpose == "REGISTER",
+            OTPVerification.verified.is_(False)
+        )
+        .order_by(OTPVerification.id.desc())
+        .first()
+    )
+
+    if not otp_record:
+        raise HTTPException(
+            status_code=404,
+            detail="No pending registration found"
+        )
+        
+    if otp_record.verified:
+        raise HTTPException(
+            status_code=400,
+            detail="Account already verified"
+        )
+
+    new_otp = generate_otp()
+
+    otp_record.otp = new_otp
+    otp_record.retry_count = 0
+    otp_record.expires_at = (
+        datetime.utcnow()
+        + timedelta(
+            minutes=settings.OTP_TOKEN_EXPIRE_MINUTES
+        )
+    )
+
+    db.commit()
+
+    send_otp_email(email, new_otp)
+
+    return {
+        "message": "OTP resent successfully"
     }
     
 
