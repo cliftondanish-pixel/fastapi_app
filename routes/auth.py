@@ -1,9 +1,11 @@
-from fastapi import (APIRouter,Depends,Response)
+from fastapi import (APIRouter,Depends,Response,Cookie)
 from sqlalchemy.orm import Session
 from core.database import get_db
-from schemas.auth import RegisterRequest
+from schemas.auth import (RegisterRequest,VerifyOTPRequest)
 from services.auth_service import register_user
-from services.jwt_service import create_otp_token
+from services.jwt_service import (create_otp_token,decode_token)
+from services.auth_service import verify_otp
+
 
 router = APIRouter(
     prefix="/auth",
@@ -27,3 +29,10 @@ def register(
     )
 
     return result
+
+@router.post("/verify-otp")
+def verify_user_otp(
+    request: VerifyOTPRequest,
+    otp_token: str = Cookie(None),
+    db:Session = Depends(get_db)
+):

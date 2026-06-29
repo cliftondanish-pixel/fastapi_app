@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from datetime import datetime, timedelta
+from core.config import settings
 from models.user import User
 from models.otp_verification import OTPVerification
 from services.otp_service import generate_otp
@@ -32,14 +33,16 @@ def register_user(db:Session,request:RegisterRequest):
         
         retry_count=0,
         
-        expires_at=datetime.utcnow() + timedelta(minutes=5)
+        expires_at=datetime.utcnow() + timedelta(minutes=settings.OTP_TOKEN_EXPIRE_MINUTES)
     )
     db.add(otp_record)
     db.commit()
     
     # print(f"OTP for {request.email}:{otp}")
     send_otp_email(request.email, otp)
-    return{"message":"OTP sent successfully"}
+    return {
+        "message":"OTP sent successfully"
+    }
     
 def verify_otp(db:Session,email:str,otp:str):
     otp_record = db.query(OTPVerification).filter(
