@@ -1,5 +1,5 @@
 from typing import Literal, Optional
-from pydantic import (BaseModel, EmailStr, field_validator)
+from pydantic import (BaseModel, EmailStr, field_validator,ConfigDict)
 
 class RegisterRequest(BaseModel):
     full_name:str
@@ -48,6 +48,4 @@ class UserResponse(BaseModel):
     account_type: str
     is_active: bool
 
-    class Config:
-        from_attributes = True
-    
+    model_config = ConfigDict(from_attributes=True)
