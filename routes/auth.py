@@ -31,7 +31,8 @@ def register(
         key="otp_token",
         value=otp_token,
         httponly=True,
-        samesite="lax"
+        samesite="lax",
+        path="/"
     )
 
     return result
@@ -103,7 +104,8 @@ def login(
         value=result["access_token"],
         httponly=True,
         samesite="lax",
-        secure=False   # True in production
+        secure=False,  # True in production
+        path="/"
     )
 
 
@@ -112,7 +114,8 @@ def login(
         value=result["refresh_token"],
         httponly=True,
         samesite="lax",
-        secure=False
+        secure=False,
+        path="/"
     )
 
 
@@ -141,7 +144,8 @@ def refresh_token(
         value=tokens["access_token"],
         httponly=True,
         samesite="lax",
-        secure=False
+        secure=False,
+        path="/"
     )
 
     response.set_cookie(
@@ -149,7 +153,8 @@ def refresh_token(
         value=tokens["refresh_token"],
         httponly=True,
         samesite="lax",
-        secure=False
+        secure=False,
+        path="/"
     )
 
     return {
@@ -170,11 +175,13 @@ def logout(
         )
 
     response.delete_cookie(
-        "access_token"
+        "access_token",
+        path="/"
     )
 
     response.delete_cookie(
-        "refresh_token"
+        "refresh_token",
+        path="/"
     )
 
     return {
@@ -202,7 +209,8 @@ def forgot_password_route(
         value=result["otp_token"],
         httponly=True,
         samesite="lax",
-        secure=False
+        secure=False,
+        path="/"
     )
 
     return {

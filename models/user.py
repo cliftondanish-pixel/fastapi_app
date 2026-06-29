@@ -1,7 +1,7 @@
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import (Column, Integer, String, Boolean, DateTime)
 
-from datetime import datetime
+from datetime import datetime, UTC
 class Base(DeclarativeBase):
     pass
 
@@ -15,5 +15,5 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     account_type = Column(String(50),nullable=False)
     is_active = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC),onupdate=lambda: datetime.now(UTC))

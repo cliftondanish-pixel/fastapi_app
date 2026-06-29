@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
-from datetime import datetime
+from datetime import datetime, UTC
 from models.user import Base
 
 class OTPVerification(Base):
@@ -16,7 +16,6 @@ class OTPVerification(Base):
     retry_count = Column(Integer,default=0)
     expires_at = Column(DateTime)
     verified = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
+    created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))    
     
     

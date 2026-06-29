@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from core.config import settings
 from models.user import User
 from services.password_service import verify_password
@@ -50,7 +50,7 @@ def register_user(db:Session,request:RegisterRequest):
         
         retry_count=0,
         
-        expires_at=datetime.utcnow() + timedelta(minutes=settings.OTP_TOKEN_EXPIRE_MINUTES)
+        expires_at=datetime.now(UTC) + timedelta(minutes=settings.OTP_TOKEN_EXPIRE_MINUTES)
     )
     db.add(otp_record)
     db.commit()
@@ -76,7 +76,7 @@ def verify_otp(db:Session,email:str,otp:str):
     if otp_record.retry_count >= 5:
         raise HTTPException(status_code=400,detail="Maximum retries exceeded")
     
-    if datetime.utcnow() > otp_record.expires_at:
+    if datetime.now(UTC) > otp_record.expires_at:
         raise HTTPException(status_code=400,detail="OTP has expired")
     
     if otp_record.otp != otp:
@@ -155,7 +155,7 @@ def resend_otp(
     otp_record.otp = new_otp
     otp_record.retry_count = 0
     otp_record.expires_at = (
-        datetime.utcnow()
+        datetime.now(UTC)
         + timedelta(
             minutes=settings.OTP_TOKEN_EXPIRE_MINUTES
         )
@@ -224,7 +224,7 @@ def login_user(
     refresh_token_record = RefreshToken(
         user_id=user.id,
         token=refresh_token,
-        expires_at=datetime.utcnow() + timedelta(
+        expires_at=datetime.now(UTC) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
         )
     )
@@ -267,7 +267,7 @@ def refresh_access_token(
         )
 
     # Check expiry
-    if datetime.utcnow() > token_record.expires_at:
+    if datetime.now(UTC) > token_record.expires_at:
         raise HTTPException(
             status_code=401,
             detail="Refresh token expired"
@@ -308,7 +308,7 @@ def refresh_access_token(
     new_token_record = RefreshToken(
         user_id=user.id,
         token=new_refresh_token,
-        expires_at=datetime.utcnow()
+        expires_at=datetime.now(UTC)
         + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
         )
@@ -366,7 +366,7 @@ def forgot_password(
         otp=otp,
         purpose="FORGOT_PASSWORD",
         retry_count=0,
-        expires_at=datetime.utcnow() + timedelta(minutes=5)
+        expires_at=datetime.now(UTC) + timedelta(minutes=5)
     )
 
     db.add(otp_record)
