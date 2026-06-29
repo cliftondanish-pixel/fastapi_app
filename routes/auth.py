@@ -123,18 +123,18 @@ def login(
 @router.post("/refresh-token")
 def refresh_token(
     response: Response,
-    refresh_token: str = Cookie(None),
+    refresh_token_cookie: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
 
-    if not refresh_token:
+    if not refresh_token_cookie:
 
         raise HTTPException(
             status_code=401,
             detail="Refresh token missing"
         )
 
-    tokens = refresh_access_token(db,refresh_token)
+    tokens = refresh_access_token(db,refresh_token_cookie)
 
     response.set_cookie(
         key="access_token",
@@ -159,14 +159,14 @@ def refresh_token(
 @router.post("/logout")
 def logout(
     response: Response,
-    refresh_token: str = Cookie(None),
+    refresh_token_cookie: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
 
-    if refresh_token:
+    if refresh_token_cookie:
         logout_user(
             db,
-            refresh_token
+            refresh_token_cookie
         )
 
     response.delete_cookie(

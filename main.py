@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from sqlalchemy import text
 from core.database import engine
 from core.config import settings
@@ -58,8 +58,8 @@ app.add_middleware(
 )
 
 @app.exception_handler(Exception) 
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled Exception: {str(exc)}")
+async def global_exception_handler(_: Request, exc: Exception):
+    logger.error("Unhandled Exception: %s", str(exc))
     return JSONResponse(
         status_code=500,
         content={"message": "Internal Server Error"}
