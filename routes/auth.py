@@ -1,4 +1,5 @@
 from fastapi import (APIRouter,Depends, HTTPException,Response,Cookie)
+from typing import Annotated
 from sqlalchemy.orm import Session
 from core.database import get_db
 from schemas.auth import (RegisterRequest,VerifyOTPRequest,LoginRequest,ForgotPasswordRequest,VerifyForgotOTPRequest,ResetPasswordRequest,UserResponse) 
@@ -126,18 +127,17 @@ def login(
 @router.post("/refresh-token")
 def refresh_token(
     response: Response,
-    refresh_token_cookie: str = Cookie(None),
+    refresh_token: Annotated[str | None, Cookie()] = None,
     db: Session = Depends(get_db)
 ):
 
-    if not refresh_token_cookie:
-
+    if not refresh_token:
         raise HTTPException(
             status_code=401,
             detail="Refresh token missing"
         )
 
-    tokens = refresh_access_token(db,refresh_token_cookie)
+    tokens = refresh_access_token(db,refresh_token)
 
     response.set_cookie(
         key="access_token",
