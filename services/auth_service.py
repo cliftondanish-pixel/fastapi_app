@@ -9,12 +9,42 @@ from models.refresh_token import RefreshToken
 from models.otp_verification import OTPVerification
 from services.otp_service import generate_otp
 from services.email_service import send_otp_email
-from services.password_service import hash_password
+from services.password_service import (hash_password,validate_password)
 from models.tenant import Tenant
 from schemas.auth import (RegisterRequest,LoginRequest)
+from services.email_validation_service import (is_personal_email,is_business_email)
 
 
 def register_user(db:Session,request:RegisterRequest):
+    
+    if request.account_type == "Individual":
+
+        if not is_personal_email(request.email):
+            raise HTTPException(
+                status_code=400,
+                detail="Individual accounts must use a personal email address"
+            )
+
+    elif request.account_type == "Organization":
+
+        if not request.organization_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Organization name is required"
+            )
+
+        if not is_business_email(request.email):
+            raise HTTPException(
+                status_code=400,
+                detail="Organization accounts must use an official business email"
+            )
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid account type"
+        )
+
     existing_user = db.query(User).filter(User.email == request.email).first()
     if existing_user:
         raise HTTPException(status_code=400,detail="Email already registered")
@@ -35,6 +65,13 @@ def register_user(db:Session,request:RegisterRequest):
     
     if request.password != request.confirm_password:
         raise HTTPException(status_code=400,detail="Passwords do not match")
+    
+    if request.password != request.confirm_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Passwords do not match"
+    )
+    validate_password(request.password)
     
     hashed_password = hash_password(request.password)
     
@@ -446,6 +483,8 @@ def reset_password(
             status_code=400,
             detail="Passwords do not match"
         )
+
+    validate_password(password)
 
     # Get latest verified forgot-password OTP
     otp_record = (

@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 from pydantic import (BaseModel, EmailStr, field_validator,ConfigDict)
 
 class RegisterRequest(BaseModel):
@@ -7,7 +7,8 @@ class RegisterRequest(BaseModel):
     password: str
     confirm_password:str
     account_type: Literal["Individual", "Organization"]
-    organization_name: Optional[str] = None
+    # organization_name: Optional[str] = None
+    organization_name: str | None = None
     
     @field_validator("password")
     @classmethod

@@ -8,10 +8,6 @@ from main import app
 
 from models.user import Base
 from core.database import get_db
-from models.user import User
-from models.tenant import Tenant
-from models.otp_verification import OTPVerification
-from models.refresh_token import RefreshToken
 
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
@@ -52,4 +48,6 @@ def clear_tables():
     yield
 
 
-client = TestClient(app)
+@pytest.fixture
+def client():
+    return TestClient(app)

@@ -1,9 +1,10 @@
-from tests.conftest import client, TestingSessionLocal
-
+import pytest
+from fastapi import HTTPException
+from tests.conftest import TestingSessionLocal
 from models.user import User
-from services.password_service import hash_password
+from services.password_service import hash_password, validate_password
 
-def test_health_check():
+def test_health_check(client):
 
     response = client.get("/health")
 
@@ -12,7 +13,7 @@ def test_health_check():
         "status": "healthy"
     }
     
-def test_login_invalid_credentials():
+def test_login_invalid_credentials(client):
 
     response = client.post(
         "/auth/login",
@@ -28,7 +29,7 @@ def test_login_invalid_credentials():
         "detail": "Invalid email or password"
     }
     
-def test_forgot_password():
+def test_forgot_password(client):
 
     db = TestingSessionLocal()
 
@@ -54,7 +55,7 @@ def test_forgot_password():
     assert response.status_code == 200
     assert response.json()["message"] == "OTP sent successfully"
     
-def test_me_without_login():
+def test_me_without_login(client):
 
     response = client.get("/auth/me")
 
@@ -64,18 +65,20 @@ def test_me_without_login():
         "detail": "Not authenticated"
     }
     
-def test_register_individual():
+def test_register_individual(client):
 
     response = client.post(
         "/auth/register",
         json={
             "full_name": "Test User",
-            "email": "test@example.com",
-            "password": "Password123",
-            "confirm_password": "Password123",
+            "email": "john@gmail.com",
+            "password": "Password@123",
+            "confirm_password": "Password@123",
             "account_type": "Individual"
         }
     )
+    
+    print(response.json())
 
     assert response.status_code == 200
 
@@ -83,13 +86,13 @@ def test_register_individual():
         "message": "OTP sent successfully"
     }
     
-def test_duplicate_email():
+def test_duplicate_email(client):
 
     data = {
         "full_name": "Test User",
-        "email": "test@example.com",
-        "password": "Password123",
-        "confirm_password": "Password123",
+        "email": "duplicate@gmail.com",
+        "password": "Password@123",
+        "confirm_password": "Password@123",
         "account_type": "Individual"
     }
 
@@ -101,32 +104,32 @@ def test_duplicate_email():
 
     assert response.json()["detail"] == "OTP already sent. Please verify or use resend OTP."
     
-def test_register_organization():
+def test_register_organization(client):
 
     response = client.post(
         "/auth/register",
         json={
-            "full_name": "Company Admin",
-            "email": "company@test.com",
-            "password": "Password123",
-            "confirm_password": "Password123",
+            "full_name": "Admin",
+            "email": "admin@mycompany.com",
+            "password": "Password@123",
+            "confirm_password": "Password@123",
             "account_type": "Organization",
-            "organization_name": "Test Company"
+            "organization_name": "My Company"
         }
     )
 
     assert response.status_code == 200
     assert response.json()["message"] == "OTP sent successfully"
 
-def test_password_mismatch():
+def test_password_mismatch(client):
 
     response = client.post(
         "/auth/register",
         json={
             "full_name": "Test User",
-            "email": "wrong@test.com",
-            "password": "Password123",
-            "confirm_password": "WrongPassword",
+            "email": "test@gmail.com",
+            "password": "Password@123",
+            "confirm_password": "Password@456",
             "account_type": "Individual"
         }
     )
@@ -134,7 +137,7 @@ def test_password_mismatch():
     assert response.status_code == 400
     assert response.json()["detail"] == "Passwords do not match"
     
-def test_valid_login():
+def test_valid_login(client):
 
     db = TestingSessionLocal()
 
@@ -164,20 +167,20 @@ def test_valid_login():
     assert "access_token" in response.cookies
     assert "refresh_token" in response.cookies
     
-def test_logout():
+def test_logout(client):
 
     response = client.post("/auth/logout")
 
     assert response.status_code == 200
     assert response.json()["message"] == "Logout successful"
     
-def test_refresh_without_token():
+def test_refresh_without_token(client):
 
     response = client.post("/auth/refresh-token")
 
     assert response.status_code == 401
     
-def test_verify_invalid_otp():
+def test_verify_invalid_otp(client):
 
     response = client.post(
         "/auth/verify-otp",
@@ -188,7 +191,7 @@ def test_verify_invalid_otp():
 
     assert response.status_code in [400, 401, 404]
     
-def test_me_with_login():
+def test_me_with_login(client):
 
     db = TestingSessionLocal()
 
@@ -219,7 +222,7 @@ def test_me_with_login():
     assert response.status_code == 200
     assert response.json()["email"] == "me@test.com"
     
-def test_refresh_token_success():
+def test_refresh_token_success(client):
 
     db = TestingSessionLocal()
 
@@ -248,9 +251,9 @@ def test_refresh_token_success():
     response = client.post("/auth/refresh-token")
 
     assert response.status_code == 200
-    assert response.json()["message"] == "Access token refreshed"
+    assert response.json()["message"] == "Tokens refreshed successfully"
     
-def test_invalid_otp_verification():
+def test_invalid_otp_verification(client):
 
     response = client.post(
         "/auth/verify-otp",
@@ -260,3 +263,98 @@ def test_invalid_otp_verification():
     )
 
     assert response.status_code in [400, 401, 404]
+    
+def test_individual_with_business_email(client):
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "full_name": "John Doe",
+            "email": "admin@company.com",
+            "password": "Password@123",
+            "confirm_password": "Password@123",
+            "account_type": "Individual"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Individual accounts must use a personal email address"
+    )
+    
+def test_organization_with_personal_email(client):
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "full_name": "Admin User",
+            "email": "admin@gmail.com",
+            "password": "Password@123",
+            "confirm_password": "Password@123",
+            "account_type": "Organization",
+            "organization_name": "ABC Company"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Organization accounts must use an official business email"
+    )
+    
+def test_organization_without_name(client):
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "full_name": "Admin User",
+            "email": "admin@company.com",
+            "password": "Password@123",
+            "confirm_password": "Password@123",
+            "account_type": "Organization"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Organization name is required"
+    )
+    
+def test_register_with_weak_password(client):
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "full_name": "John Doe",
+            "email": "john@gmail.com",
+            "password": "password",
+            "confirm_password": "password",
+            "account_type": "Individual"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Password must contain at least one uppercase letter"
+    )
+    
+def test_weak_password():
+
+    with pytest.raises(HTTPException) as exc:
+        validate_password("password")
+
+    assert exc.value.status_code == 400
+    assert "uppercase" in exc.value.detail
+# def test_reset_password_with_weak_password(client):
+
+#     # Use a valid email and verified OTP setup
+
+#     response = client.post(
+#         "/auth/reset-password",
+#         json={
+#             "email": "john@gmail.com",
+#             "password": "password",
+#             "confirm_password": "password"
+#         }
+#     )
+
+#     assert response.status_code == 400
