@@ -5,8 +5,6 @@ from core.config import settings
 from models.user import User
 from services.password_service import verify_password
 from services.jwt_service import (create_access_token,create_refresh_token,decode_token,create_otp_token)
-from models.refresh_token import RefreshToken
-from models.otp_verification import OTPVerification
 from services.otp_service import generate_otp
 from services.email_service import send_otp_email
 from services.password_service import (hash_password,validate_password)
@@ -49,85 +47,51 @@ def register_user(db:Session,request:RegisterRequest):
     if existing_user:
         raise HTTPException(status_code=400,detail="Email already registered")
     
-    pending_registration = db.query(
-        OTPVerification
-    ).filter(
-        OTPVerification.email == request.email,
-        OTPVerification.verified.is_(False),
-        OTPVerification.expires_at > datetime.now(UTC)
-    ).first()
-    
-    if pending_registration:
-        raise HTTPException(
-            status_code=400,
-            detail="OTP already sent. Please verify or use resend OTP."
-    )
-    
     if request.password != request.confirm_password:
         raise HTTPException(status_code=400,detail="Passwords do not match")
     
-    if request.password != request.confirm_password:
-        raise HTTPException(
-            status_code=400,
-            detail="Passwords do not match"
-    )
     validate_password(request.password)
     
     hashed_password = hash_password(request.password)
     
     otp = generate_otp()
-    otp_record = OTPVerification(
-        email=request.email,
-        otp=otp,
-        purpose="REGISTER",
-        
-        full_name=request.full_name,
-        password_hash=hashed_password,
-        account_type=request.account_type,
-        organization_name=request.organization_name,
-        
-        retry_count=0,
-        
-        expires_at=datetime.now(UTC) + timedelta(minutes=settings.OTP_TOKEN_EXPIRE_MINUTES)
-    )
-    db.add(otp_record)
-    db.commit()
-    
-    # print(f"OTP for {request.email}:{otp}")
-    send_otp_email(request.email, otp)
-    return {
-        "message":"OTP sent successfully"
+
+    otp_payload = {
+        "email": request.email,
+        "otp": otp,
+        "purpose": "REGISTER",
+        "full_name": request.full_name,
+        "password_hash": hashed_password,
+        "account_type": request.account_type,
+        "organization_name": request.organization_name,
+        "retry_count": 0
+
     }
+
+    otp_token = create_otp_token(otp_payload)
+
+    send_otp_email(request.email, otp)
+
+    return {
+        "message": "OTP sent successfully",
+        "otp_token": otp_token
+    }
+    # print(f"OTP for {request.email}:{otp}")
     
-def verify_otp(db:Session,email:str,otp:str):
-    otp_record = db.query(OTPVerification).filter(
-        OTPVerification.email == email,
-        OTPVerification.purpose == "REGISTER",
-        OTPVerification.verified.is_(False)
-    ).order_by(
-        OTPVerification.id.desc()
-    ).first()
+def verify_otp(db: Session,payload: dict,otp: str):  
     
-    if not otp_record:
-        raise HTTPException(status_code=404,detail="OTP not found")
-    
-    if otp_record.retry_count >= 5:
+    if payload.get("retry_count", 0) >= 5:
         raise HTTPException(status_code=400,detail="Maximum retries exceeded")
     
     # print("Current local time:", datetime.now())
     # print("Current UTC time:", datetime.utcnow())
     # print("Expires at:", otp_record.expires_at)
     
-    if datetime.utcnow() > otp_record.expires_at:
-        raise HTTPException(status_code=400,detail="OTP has expired")
-    
-    if otp_record.otp != otp:
-        otp_record.retry_count +=1
-        db.commit()
+    if payload["otp"] != otp:
         raise HTTPException(status_code=400,detail="Invalid OTP")
     
     existing_user = db.query(User).filter(
-    User.email == email
+    User.email == payload["email"]
     ).first()
     
     if existing_user:
@@ -137,10 +101,10 @@ def verify_otp(db:Session,email:str,otp:str):
         )
     
     user = User(
-        full_name=otp_record.full_name,
-        email=otp_record.email,
-        password_hash=otp_record.password_hash,
-        account_type=otp_record.account_type,
+        full_name=payload["full_name"],
+        email=payload["email"],
+        password_hash=payload["password_hash"],
+        account_type=payload["account_type"],
         is_active=True
     )
     
@@ -149,66 +113,33 @@ def verify_otp(db:Session,email:str,otp:str):
     db.commit()
     db.refresh(user)
     
-    if otp_record.account_type == "Organization":
+    if payload["account_type"] == "Organization":
         tenant = Tenant(
-            organization_name=otp_record.organization_name,
+            organization_name=payload["organization_name"],
             owner_user_id=user.id,
             status="ACTIVE"
         )
         db.add(tenant)
         db.commit()
-    otp_record.verified = True 
         
-    db.commit()
     return {
             "message":"Account verified successfully"
     }
     
-def resend_otp(
-    db: Session,
-    email: str
-):
-
-    otp_record = (
-        db.query(OTPVerification)
-        .filter(
-            OTPVerification.email == email,
-            OTPVerification.purpose == "REGISTER",
-            OTPVerification.verified.is_(False)
-        )
-        .order_by(OTPVerification.id.desc())
-        .first()
-    )
-
-    if not otp_record:
-        raise HTTPException(
-            status_code=404,
-            detail="No pending registration found"
-        )
-        
-    if otp_record.verified:
-        raise HTTPException(
-            status_code=400,
-            detail="Account already verified"
-        )
+def resend_otp(payload: dict):
 
     new_otp = generate_otp()
 
-    otp_record.otp = new_otp
-    otp_record.retry_count = 0
-    otp_record.expires_at = (
-        datetime.now(UTC)
-        + timedelta(
-            minutes=settings.OTP_TOKEN_EXPIRE_MINUTES
-        )
-    )
+    payload["otp"] = new_otp
+    payload["retry_count"] = 0
 
-    db.commit()
+    new_token = create_otp_token(payload)
 
-    send_otp_email(email, new_otp)
+    send_otp_email(payload["email"], new_otp)
 
     return {
-        "message": "OTP resent successfully"
+        "message": "OTP resent successfully",
+        "otp_token": new_token
     }
     
 def login_user(
@@ -262,19 +193,6 @@ def login_user(
         }
     )
 
-
-    refresh_token_record = RefreshToken(
-        user_id=user.id,
-        token=refresh_token,
-        expires_at=datetime.utcnow() + timedelta(
-            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-        )
-    )
-
-    db.add(refresh_token_record)
-    db.commit()
-
-
     return {
         "message": "Login successful",
         "access_token": access_token,
@@ -295,24 +213,6 @@ def refresh_access_token(
         raise HTTPException(
             status_code=401,
             detail="Invalid refresh token"
-        )
-
-    # Check token exists in DB
-    token_record = db.query(RefreshToken).filter(
-        RefreshToken.token == refresh_token
-    ).first()
-
-    if not token_record:
-        raise HTTPException(
-            status_code=401,
-            detail="Refresh token not found"
-        )
-
-    # Check expiry
-    if datetime.utcnow() > token_record.expires_at:
-        raise HTTPException(
-            status_code=401,
-            detail="Refresh token expired"
         )
 
     # Get user
@@ -341,25 +241,6 @@ def refresh_access_token(
         }
     )
 
-
-    # Delete old refresh token
-    db.delete(token_record)
-
-
-    # Save new refresh token
-    new_token_record = RefreshToken(
-        user_id=user.id,
-        token=new_refresh_token,
-        expires_at=datetime.now(UTC)
-        + timedelta(
-            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-        )
-    )
-
-    db.add(new_token_record)
-    db.commit()
-
-
     return {
         "access_token": access_token,
         "refresh_token": new_refresh_token
@@ -369,23 +250,9 @@ def logout_user(
     db: Session,
     refresh_token: str
 ):
-
-    token_record = db.query(
-        RefreshToken
-    ).filter(
-        RefreshToken.token == refresh_token
-    ).first()
-
-
-    if token_record:
-        db.delete(token_record)
-        db.commit()
-
-
     return {
         "message": "Logout successful"
     }
-
 def forgot_password(
     db: Session,
     email: str
@@ -403,20 +270,15 @@ def forgot_password(
 
     otp = generate_otp()
 
-    otp_record = OTPVerification(
-        email=email,
-        otp=otp,
-        purpose="FORGOT_PASSWORD",
-        retry_count=0,
-        expires_at=datetime.now(UTC) + timedelta(minutes=settings.OTP_TOKEN_EXPIRE_MINUTES)      
-    )
-
-    db.add(otp_record)
-    db.commit()
-
+    payload = {
+        "email": email,
+        "otp": otp,
+        "purpose": "FORGOT_PASSWORD",
+        "retry_count": 0
+    }
+    
+    otp_token = create_otp_token(payload)
     send_otp_email(email, otp)
-
-    otp_token = create_otp_token(email)
 
     return {
         "message": "OTP sent successfully",
@@ -424,60 +286,33 @@ def forgot_password(
     }
     
 def verify_forgot_otp(
-    db: Session,
-    email: str,
+    payload: dict,
     otp: str
 ):
 
-    otp_record = (
-        db.query(OTPVerification)
-        .filter(
-            OTPVerification.email == email,
-            OTPVerification.purpose == "FORGOT_PASSWORD",
-            OTPVerification.verified == False
-        )
-        .order_by(OTPVerification.id.desc())
-        .first()
-    )
-
-    if not otp_record:
-        raise HTTPException(
-            status_code=404,
-            detail="OTP not found"
-        )
-
-    if otp_record.retry_count >= 5:
+    if payload.get("retry_count", 0) >= 5:
         raise HTTPException(
             status_code=400,
             detail="Maximum retries exceeded"
         )
 
-    if datetime.utcnow() > otp_record.expires_at:
+    if payload["purpose"] != "FORGOT_PASSWORD":
         raise HTTPException(
             status_code=400,
-            detail="OTP has expired"
+            detail="Invalid OTP token"
         )
 
-    if otp_record.otp != otp:
-
-        otp_record.retry_count += 1
-        db.commit()
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid OTP"
-        )
-
-    otp_record.verified = True
-    db.commit()
+    payload["verified"] = True
+    new_token = create_otp_token(payload)
 
     return {
-        "message": "OTP verified successfully"
+        "message": "OTP verified successfully",
+        "otp_token": new_token
     }
     
 def reset_password(
     db: Session,
-    email: str,
+    payload: dict,
     password: str,
     confirm_password: str
 ):
@@ -489,20 +324,14 @@ def reset_password(
         )
 
     validate_password(password)
-
-    # Get latest verified forgot-password OTP
-    otp_record = (
-        db.query(OTPVerification)
-        .filter(
-            OTPVerification.email == email,
-            OTPVerification.purpose == "FORGOT_PASSWORD",
-            OTPVerification.verified == True
+    
+    if payload.get("purpose") != "FORGOT_PASSWORD":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid OTP token"
         )
-        .order_by(OTPVerification.id.desc())
-        .first()
-    )
 
-    if not otp_record:
+    if not payload.get("verified"):
         raise HTTPException(
             status_code=400,
             detail="OTP verification required"
@@ -511,7 +340,7 @@ def reset_password(
     # Find user
     user = (
         db.query(User)
-        .filter(User.email == email)
+        .filter(User.email == payload["email"])
         .first()
     )
 
@@ -523,7 +352,6 @@ def reset_password(
 
     # Update password
     user.password_hash = hash_password(password)
-
     db.commit()
 
     return {

@@ -16,9 +16,8 @@ def create_refresh_token(data: dict):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode,settings.SECRET_KEY,algorithm=settings.ALGORITHM)
 
-def create_otp_token(email: str):
-    expire = datetime.now(UTC) + timedelta(minutes=settings.OTP_TOKEN_EXPIRE_MINUTES)
-    payload = {"email": email,"exp": expire}
+def create_otp_token(payload: dict):
+    payload["exp"] = (datetime.now(UTC) + timedelta(minutes=settings.OTP_TOKEN_EXPIRE_MINUTES))
     return jwt.encode(payload,settings.SECRET_KEY,algorithm=settings.ALGORITHM)
 
 def decode_token(token: str):

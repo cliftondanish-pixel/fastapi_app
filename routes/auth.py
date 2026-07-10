@@ -26,23 +26,27 @@ def register(
     db: Session = Depends(get_db)
 ):
 
-    result = register_user(db,request)
-    otp_token = create_otp_token(request.email)
+    result = register_user(db, request)
+
     response.set_cookie(
         key="otp_token",
-        value=otp_token,
+        value=result["otp_token"],
         httponly=True,
+        secure=False,      # True in production
         samesite="lax",
         path="/"
     )
 
-    return result
+    return {
+        "message": result["message"]
+    }
 
 @router.post("/verify-otp")
 def verify_user_otp(
     request: VerifyOTPRequest,
+    response: Response,
     otp_token: str = Cookie(None),
-    db:Session = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
     if not otp_token:
 
@@ -50,27 +54,27 @@ def verify_user_otp(
             status_code=401,
             detail="OTP token missing"
         )
+        
+    payload = decode_token(otp_token)
 
-
-    payload = decode_token(
-        otp_token
-    )
-
-    email = payload["email"]
-
-
-    return verify_otp(
+    result = verify_otp(
         db,
-        email,
+        payload,
         request.otp
     )
+
+    response.delete_cookie(
+        key="otp_token",
+        path="/"
+    )
+
+    return result
     
 @router.post("/resend-otp")
 def resend_user_otp(
-    otp_token: str = Cookie(None),
-    db: Session = Depends(get_db)
+    response: Response,
+    otp_token: str = Cookie(None)
 ):
-
     if not otp_token:
         raise HTTPException(
             status_code=401,
@@ -79,9 +83,21 @@ def resend_user_otp(
 
     payload = decode_token(otp_token)
 
-    email = payload["email"]
+    result = resend_otp(payload)
 
-    return resend_otp(db, email)
+    response.set_cookie(
+        key="otp_token",
+        value=result["otp_token"],
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/"
+    )
+
+    return {
+        "message": result["message"]
+    } 
+    
 
 @router.post(
     "/login",
@@ -220,8 +236,8 @@ def forgot_password_route(
 @router.post("/verify-forgot-otp")
 def verify_forgot_password_otp(
     request: VerifyForgotOTPRequest,
-    otp_token: str = Cookie(None),
-    db: Session = Depends(get_db)
+    response: Response,
+    otp_token: str = Cookie(None)
 ):
 
     if not otp_token:
@@ -232,23 +248,28 @@ def verify_forgot_password_otp(
 
     payload = decode_token(otp_token)
 
-    print(payload)
-    print(type(payload))
-    
-    email = payload["email"]
-    
-    print(email)
-    print(type(email))
-
-    return verify_forgot_otp(
-        db,
-        email,
+    result = verify_forgot_otp(
+        payload,
         request.otp
     )
+
+    response.set_cookie(
+        key="otp_token",
+        value=result["otp_token"],
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/"
+    )
+
+    return {
+        "message": result["message"]
+    }
     
 @router.post("/reset-password")
 def reset_password_route(
     request: ResetPasswordRequest,
+    response: Response,
     otp_token: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
@@ -261,14 +282,19 @@ def reset_password_route(
 
     payload = decode_token(otp_token)
 
-    email = payload["email"]
-
-    return reset_password(
+    result = reset_password(
         db,
-        email,
+        payload,
         request.new_password,
         request.confirm_password
     )
+
+    response.delete_cookie(
+        key="otp_token",
+        path="/"
+    )
+
+    return result
     
 @router.get(
     "/me",
