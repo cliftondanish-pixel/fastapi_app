@@ -14,6 +14,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     account_type = Column(String(50),nullable=False)
+    role = Column(String(50),nullable=True)
     tenant_id = Column(Integer,ForeignKey("tenants.id"),nullable=True)
     is_active = Column(Boolean, default=False)
     created_at = Column(DateTime(),default=datetime.now(UTC))

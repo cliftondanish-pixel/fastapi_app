@@ -3,8 +3,10 @@ from sqlalchemy import text
 from core.database import engine
 from core.config import settings
 from core.logger import logger
-from routes import auth
+from routes import auth, dashboard
 from routes import tenant
+from routes import users
+from routes import organization
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +19,9 @@ app = FastAPI(
 )
 app.include_router(auth.router)
 app.include_router(tenant.router,prefix="/tenant",tags=["Tenant"])
+app.include_router(users.router)
+app.include_router(dashboard.router)
+app.include_router(organization.router)
 
 
 @app.get("/")
