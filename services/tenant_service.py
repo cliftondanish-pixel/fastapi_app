@@ -17,6 +17,12 @@ def create_tenant_user(
             status_code=403,
             detail="Only organization administrators can create users"
         )
+        
+    if current_user.role != "Tenant Admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only Tenant Admin can create organization users"
+        )
     
     if current_user.tenant_id is None:
         raise HTTPException(
@@ -51,6 +57,7 @@ def create_tenant_user(
     password_hash=hashed_password,
     account_type="Organization",
     tenant_id=current_user.tenant_id,
+    role="Tenant User",
     is_active=True
     )
     
@@ -132,7 +139,13 @@ def update_tenant_user(
     if current_user.account_type != "Organization":
         raise HTTPException(
             status_code=403,
-            detail="Only organization administrators can update users"
+            detail="Only organization users can access this endpoint"
+        )
+
+    if current_user.role != "Tenant Admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only Tenant Admin can update organization users"
         )
     
     if current_user.tenant_id is None:
@@ -187,7 +200,13 @@ def update_user_status(
     if current_user.account_type != "Organization":
         raise HTTPException(
             status_code=403,
-            detail="Only organization administrators can update user status"
+            detail="Only organization users can access this endpoint"
+        )
+
+    if current_user.role != "Tenant Admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only Tenant Admin can change user status"
         )
     
     if current_user.tenant_id is None:
@@ -229,13 +248,13 @@ def delete_tenant_user(
     if current_user.account_type != "Organization":
         raise HTTPException(
             status_code=403,
-            detail="Only organization administrators can delete users"
+            detail="Only organization users can access this endpoint"
         )
-    
-    if current_user.tenant_id is None:
+
+    if current_user.role != "Tenant Admin":
         raise HTTPException(
-            status_code=400,
-            detail="Organization not found"
+            status_code=403,
+            detail="Only Tenant Admin can delete organization users"
         )
     
     user = (

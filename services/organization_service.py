@@ -61,7 +61,7 @@ def update_organization_profile(
             detail="Organization not found"
         )
 
-    if tenant.owner_user_id != current_user.id:
+    if current_user.role != "Tenant Admin":
         raise HTTPException(
             status_code=403,
             detail="Only Tenant Admin can update organization profile"
