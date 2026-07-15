@@ -4,6 +4,7 @@ from core.database import engine
 from core.config import settings
 from core.logger import logger
 from routes import auth
+from routes import tenant
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,7 @@ app = FastAPI(
     version=settings.APP_VERSION
 )
 app.include_router(auth.router)
+app.include_router(tenant.router,prefix="/tenant",tags=["Tenant"])
 
 
 @app.get("/")

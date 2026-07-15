@@ -10,10 +10,7 @@ from dependencies.auth import get_current_user
 from models.user import User
 
 
-router = APIRouter(
-    prefix="/auth",
-    tags=["Authentication"]
-)
+router = APIRouter(prefix="/auth",tags=["Authentication"])
 
 @router.post(
     "/register",
@@ -61,11 +58,6 @@ def verify_user_otp(
         db,
         payload,
         request.otp
-    )
-
-    response.delete_cookie(
-        key="otp_token",
-        path="/"
     )
 
     return result
@@ -199,6 +191,11 @@ def logout(
         "refresh_token",
         path="/"
     )
+    
+    response.delete_cookie(
+        key="otp_token",
+        path="/"
+    )
 
     return {
         "message": "Logout successful"
@@ -287,11 +284,6 @@ def reset_password_route(
         payload,
         request.new_password,
         request.confirm_password
-    )
-
-    response.delete_cookie(
-        key="otp_token",
-        path="/"
     )
 
     return result

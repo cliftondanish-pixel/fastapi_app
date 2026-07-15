@@ -1,6 +1,7 @@
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import (Column, Integer, String, Boolean, DateTime)
 from datetime import datetime, UTC
+from sqlalchemy import ForeignKey
 class Base(DeclarativeBase):
     pass
 
@@ -13,6 +14,8 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     account_type = Column(String(50),nullable=False)
+    tenant_id = Column(Integer,ForeignKey("tenants.id"),nullable=True)
     is_active = Column(Boolean, default=False)
     created_at = Column(DateTime(),default=datetime.now(UTC))
     updated_at = Column(DateTime(),default=datetime.now(UTC),onupdate=datetime.now(UTC))
+    

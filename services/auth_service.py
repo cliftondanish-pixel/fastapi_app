@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from datetime import datetime, timedelta, UTC
-from core.config import settings
+# from datetime import datetime, timedelta, UTC
+# from core.config import settings
 from models.user import User
 from services.password_service import verify_password
 from services.jwt_service import (create_access_token,create_refresh_token,decode_token,create_otp_token)
@@ -120,6 +120,10 @@ def verify_otp(db: Session,payload: dict,otp: str):
             status="ACTIVE"
         )
         db.add(tenant)
+        db.commit()
+        db.refresh(tenant)
+
+        user.tenant_id = tenant.id
         db.commit()
         
     return {
