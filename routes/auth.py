@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from schemas.auth import (RegisterRequest,VerifyOTPRequest,LoginRequest,ForgotPasswordRequest,VerifyForgotOTPRequest,ResetPasswordRequest,UserResponse) 
 from services.auth_service import (logout_user, register_user,login_user,refresh_access_token,forgot_password,verify_forgot_otp,reset_password)
-from services.jwt_service import (create_otp_token,decode_token)
+from services.jwt_service import decode_token
 from services.auth_service import (verify_otp,resend_otp)
 from dependencies.auth import get_current_user
 from models.user import User
