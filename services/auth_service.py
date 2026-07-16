@@ -125,7 +125,6 @@ def verify_otp(db: Session,payload: dict,otp: str):
 
         user.tenant_id = tenant.id
         user.role = "Tenant Admin"
-        
         db.commit()
         
     return {

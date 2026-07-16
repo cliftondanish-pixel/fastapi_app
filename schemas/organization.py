@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from pydantic import ConfigDict
 
 class OrganizationProfileResponse(BaseModel):
     id: int
@@ -7,7 +8,7 @@ class OrganizationProfileResponse(BaseModel):
     owner_user_id: int
 
     class Config:
-        from_attributes = True
+        model_config = ConfigDict(from_attributes=True)
         
 class UpdateOrganizationProfileRequest(BaseModel):
     organization_name: str

@@ -86,7 +86,7 @@ def test_register_individual(client):
         "message": "OTP sent successfully"
     }
     
-def test_duplicate_email(client):
+def test_repeat_registration_before_verification_allowed(client):
 
     data = {
         "full_name": "Test User",
@@ -96,13 +96,16 @@ def test_duplicate_email(client):
         "account_type": "Individual"
     }
 
-    client.post("/auth/register", json=data)
+    first_response = client.post("/auth/register", json=data)
+    assert first_response.status_code == 200
 
-    response = client.post("/auth/register", json=data)
+    second_response = client.post("/auth/register", json=data)
 
-    assert response.status_code == 400
+    assert second_response.status_code == 200
 
-    assert response.json()["detail"] == "OTP already sent. Please verify or use resend OTP."
+    assert second_response.json()["message"] == "OTP sent successfully"
+
+    assert "otp_token" in second_response.cookies
     
 def test_register_organization(client):
 

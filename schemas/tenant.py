@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-
+from pydantic import ConfigDict
 
 class CreateTenantUserRequest(BaseModel):
     full_name: str
@@ -15,7 +15,7 @@ class TenantUserResponse(BaseModel):
     is_active: bool
 
     class Config:
-        from_attributes = True
+        model_config = ConfigDict(from_attributes=True)
         
 class UpdateTenantUserRequest(BaseModel):
     full_name: str
