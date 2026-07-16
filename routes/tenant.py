@@ -10,7 +10,7 @@ from services.tenant_service import create_tenant_user, delete_tenant_user, get_
 router = APIRouter()
 
 
-@router.post("/invite")
+@router.post("/create-user")
 def create_user(
     request: CreateTenantUserRequest,
     current_user: User = Depends(get_current_user),
